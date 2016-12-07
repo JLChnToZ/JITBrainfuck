@@ -17,12 +17,6 @@ namespace JITBrainfuck {
         public void Compile() {
             if(compiledMethod != null) return;
 
-            const BindingFlags privateStaticMethod = BindingFlags.NonPublic | BindingFlags.Static;
-
-            Type baseType = typeof(Runner);
-            MethodInfo readByteMethod = baseType.GetMethod("ReadByte", privateStaticMethod);
-            MethodInfo writeByteMethod = baseType.GetMethod("WriteByte", privateStaticMethod);
-
             DynamicMethod generatedMethod = new DynamicMethod(
                 "_Compiled_",
                 null, new[] {
@@ -32,7 +26,7 @@ namespace JITBrainfuck {
                     typeof(TextWriter),
                     typeof(bool)
                 },
-                baseType.Module,
+                typeof(Runner).Module,
                 true
             );
             generatedMethod.DefineParameter(1, ParameterAttributes.In, "memory");
@@ -40,12 +34,22 @@ namespace JITBrainfuck {
             generatedMethod.DefineParameter(3, ParameterAttributes.In, "input");
             generatedMethod.DefineParameter(4, ParameterAttributes.In, "output");
             generatedMethod.DefineParameter(5, ParameterAttributes.In, "canSeek");
+            
+            EmitIL(generatedMethod.GetILGenerator());
 
-            ILGenerator il = generatedMethod.GetILGenerator();
+            compiledMethod = generatedMethod.CreateDelegate(typeof(RunnerDelegate)) as RunnerDelegate;
+        }
 
-            il.Emit(OpCodes.Nop);
+        internal void EmitIL(ILGenerator il) {
+            const BindingFlags privateStaticMethod = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+
+            Type baseType = typeof(Helper);
+            MethodInfo readByteMethod = baseType.GetMethod("ReadByte", privateStaticMethod);
+            MethodInfo writeByteMethod = baseType.GetMethod("WriteByte", privateStaticMethod);
 
             Stack<LabelPair> labelPairs = new Stack<LabelPair>();
+
+            il.Emit(OpCodes.Nop);
 
             foreach(Instruction instruction in instructions) {
                 LabelPair labelPair;
@@ -128,8 +132,6 @@ namespace JITBrainfuck {
             }
             il.Emit(OpCodes.Nop);
             il.Emit(OpCodes.Ret);
-
-            compiledMethod = generatedMethod.CreateDelegate(typeof(RunnerDelegate)) as RunnerDelegate;
         }
     }
 }

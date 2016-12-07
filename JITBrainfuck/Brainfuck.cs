@@ -35,7 +35,6 @@ namespace JITBrainfuck {
         public const int DefaultStackDepth = 256;
 
         private const int ByteWrap = 256;
-        private const int MillisecondsCheckInput = 100;
 
         public int MemoryLength {
             get { return memoryLength; }
@@ -203,28 +202,14 @@ namespace JITBrainfuck {
                         break;
                     case Op.Read:
                         if(skip == 0)
-                            memory[pointer] = ReadByte(input, canSeek);
+                            memory[pointer] = Helper.ReadByte(input, canSeek);
                         break;
                     case Op.Write:
                         if(skip == 0)
-                            WriteByte(output, memory[pointer]);
+                            Helper.WriteByte(output, memory[pointer]);
                         break;
                 }
             }
-        }
-
-        private static byte ReadByte(TextReader input, bool canSeek) {
-            if(canSeek)
-                while(input.Peek() < 0)
-                    Thread.Sleep(MillisecondsCheckInput); // Sleep and wait for input
-            int data = input.Read();
-            if(data < 0)
-                throw new EndOfStreamException("Input stream is not enough to feed the program.");
-            return unchecked((byte)data);
-        }
-
-        private static void WriteByte(TextWriter output, byte b) {
-            output.Write((char)b);
         }
     }
 }

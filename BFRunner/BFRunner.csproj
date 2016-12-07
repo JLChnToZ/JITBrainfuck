@@ -35,18 +35,31 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="CommandLine, Version=1.9.71.2, Culture=neutral, PublicKeyToken=de6f01bd326f8c32, processorArchitecture=MSIL">
+      <HintPath>..\packages\CommandLineParser.1.9.71\lib\net45\CommandLine.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="JITCompiler.cs" />
-    <Compile Include="Brainfuck.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BFRuntime\BFRuntime.csproj">
+      <Project>{5b3d0c65-0e64-4266-9c36-1a45a5dd855e}</Project>
+      <Name>BFRuntime</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\JITBrainfuck\JITBrainfuck.csproj">
+      <Project>{dd7b49a6-67a2-473f-bf80-0d70ff3d2810}</Project>
+      <Name>JITBrainfuck</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

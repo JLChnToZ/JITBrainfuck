@@ -3,7 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25123.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Brainfuck Interpreter", "Brainfuck Interpreter.csproj", "{84FF8691-FFA2-457A-BA5F-CF7E5E74090A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BFRuntime", "BFRuntime\BFRuntime.csproj", "{5B3D0C65-0E64-4266-9C36-1A45A5DD855E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JITBrainfuck", "JITBrainfuck\JITBrainfuck.csproj", "{DD7B49A6-67A2-473F-BF80-0D70FF3D2810}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BFRunner", "BFRunner\BFRunner.csproj", "{84FF8691-FFA2-457A-BA5F-CF7E5E74090A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,6 +15,14 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5B3D0C65-0E64-4266-9C36-1A45A5DD855E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5B3D0C65-0E64-4266-9C36-1A45A5DD855E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5B3D0C65-0E64-4266-9C36-1A45A5DD855E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5B3D0C65-0E64-4266-9C36-1A45A5DD855E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DD7B49A6-67A2-473F-BF80-0D70FF3D2810}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DD7B49A6-67A2-473F-BF80-0D70FF3D2810}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DD7B49A6-67A2-473F-BF80-0D70FF3D2810}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DD7B49A6-67A2-473F-BF80-0D70FF3D2810}.Release|Any CPU.Build.0 = Release|Any CPU
 		{84FF8691-FFA2-457A-BA5F-CF7E5E74090A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{84FF8691-FFA2-457A-BA5F-CF7E5E74090A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{84FF8691-FFA2-457A-BA5F-CF7E5E74090A}.Release|Any CPU.ActiveCfg = Release|Any CPU
