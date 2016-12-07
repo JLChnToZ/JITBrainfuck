@@ -32,10 +32,6 @@ namespace JITBrainfuck {
             HelpText = "Optional assembly name for signature of the output executable assembly file.")]
         public string OutputAssemblyName { get; set; }
 
-        [Option("modulename",
-            HelpText = "Optional module name for signature of the output executable assembly file.")]
-        public string ModuleName { get; set; }
-
         [ValueList(typeof(List<string>), MaximumElements = 1)]
         public List<string> FileName { get; set; }
 
@@ -49,41 +45,55 @@ namespace JITBrainfuck {
 
     class Program {
         static void Main(string[] args) {
-            Options options = new Options();
-            if(Parser.Default.ParseArguments(args, options)) {
-                if(options.FileName.Count < 1) {
-                    Console.WriteLine("No file is selected");
-                    return;
+            try {
+                Options options = new Options();
+                if(Parser.Default.ParseArguments(args, options)) {
+                    if(options.FileName.Count < 1) {
+                        Console.WriteLine("No file is selected");
+                        return;
+                    }
+
+                    string arg = options.FileName[0], path = "", content;
+                    try {
+                        path = Path.GetFullPath(arg);
+                        FileInfo fileInfo = new FileInfo(path);
+                        if(!fileInfo.Exists) return;
+                        using(StreamReader sr = fileInfo.OpenText())
+                            content = sr.ReadToEnd();
+                    } catch(ArgumentException) {
+                        content = arg;
+                    }
+
+                    Runner runner = new Runner(content, options.MemorySize, options.MaxStackDepth);
+
+                    if(!string.IsNullOrEmpty(options.OutputFileName)) {
+                        if(string.IsNullOrEmpty(options.OutputFileName))
+                            options.OutputAssemblyName = "Brainfuck-Compiled-Code";
+                        Console.WriteLine("Creating assembly {0} to {1}...", options.OutputAssemblyName, options.OutputFileName);
+                        BF2Assembly.CompileToFile(runner, options.OutputAssemblyName, options.OutputFileName);
+                        return;
+                    }
+
+                    if(!options.Interpret)
+                        runner.Compile();
+
+                    Console.InputEncoding = Encoding.ASCII;
+                    Console.OutputEncoding = Encoding.ASCII;
+                    runner.Run(Console.In, Console.Out);
+
+                    Console.ReadKey(true);
                 }
-
-                string arg = options.FileName[0], path = "", content;
-                try {
-                    path = Path.GetFullPath(arg);
-                    FileInfo fileInfo = new FileInfo(path);
-                    if(!fileInfo.Exists) return;
-                    using(StreamReader sr = fileInfo.OpenText())
-                        content = sr.ReadToEnd();
-                } catch(ArgumentException) {
-                    content = arg;
+            } catch(Exception ex) {
+                Console.OutputEncoding = Encoding.Default;
+                Console.Write("Error: ");
+                while(ex != null) {
+                    Console.WriteLine("{0}\n{1}", ex.Message, ex.StackTrace);
+                    if(ex == ex.InnerException)
+                        break;
+                    ex = ex.InnerException;
+                    if(ex != null)
+                        Console.Write("Inner Exception: ");
                 }
-
-                Runner runner = new Runner(content, options.MemorySize, options.MaxStackDepth);
-
-                if(!string.IsNullOrEmpty(options.OutputFileName)) {
-                    if(string.IsNullOrEmpty(options.OutputFileName))
-                        options.OutputAssemblyName = "Brainfuck-Compiled-Code";
-                    Console.WriteLine("Creating assembly {0} to {1}...", options.OutputAssemblyName, options.OutputFileName);
-                    BF2Assembly.CompileToFile(runner, options.OutputAssemblyName, options.ModuleName ?? "BFModule", options.OutputFileName);
-                    return;
-                }
-
-                if(!options.Interpret)
-                    runner.Compile();
-
-                Console.InputEncoding = Encoding.ASCII;
-                Console.OutputEncoding = Encoding.ASCII;
-                runner.Run(Console.In, Console.Out);
-                Console.ReadKey(true);
             }
         }
     }
