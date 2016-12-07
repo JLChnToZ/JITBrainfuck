@@ -53,9 +53,9 @@ namespace JITBrainfuck {
             }
         }
 
-        public static void Run(string code, TextReader input, TextWriter output, int memoryLength = DefaultMemoryLength, int stackDepth = DefaultStackDepth, ParseMode parseMode = ParseMode.Interpret) {
+        public static Runner Run(string code, TextReader input, TextWriter output, int memoryLength = DefaultMemoryLength, int stackDepth = DefaultStackDepth, ParseMode parseMode = ParseMode.Interpret) {
             if(string.IsNullOrEmpty(code))
-                return;
+                return null;
             if(input == null)
                 throw new ArgumentNullException("input");
             if(output == null)
@@ -71,6 +71,8 @@ namespace JITBrainfuck {
                     break;
             }
             instructionSet.Run(input, output);
+
+            return instructionSet;
         }
 
         public Runner(string code, int memoryLength = DefaultMemoryLength, int stackDepth = DefaultStackDepth) {
@@ -148,17 +150,26 @@ namespace JITBrainfuck {
         }
 
         public void Run(TextReader input, TextWriter output) {
-            bool canSeek;
-            CheckBeforeRun(input, output, out canSeek);
+            if(input == null)
+                throw new ArgumentNullException("input");
+            if(output == null)
+                throw new ArgumentNullException("output");
+
+            bool canSeek = true;
+            StreamReader sr = input as StreamReader;
+            if(sr != null && !sr.BaseStream.CanSeek)
+                canSeek = false;
 
             byte[] memory = new byte[memoryLength];
             int pointer = 0;
 
-            if(compiledMethod != null) {
+            if(compiledMethod != null)
                 compiledMethod.Invoke(memory, ref pointer, input, output, canSeek);
-                return;
-            }
+            else
+                Interpret(memory, ref pointer, input, output, canSeek);
+        }
 
+        private void Interpret(byte[] memory, ref int pointer, TextReader input, TextWriter output, bool canSeek) {
             Stack<int> loopPoints = new Stack<int>(stackDepth);
 
             for(int cursor = 0, skip = 0, length = instructions.Count; cursor < length; cursor++) {
@@ -200,18 +211,6 @@ namespace JITBrainfuck {
                         break;
                 }
             }
-        }
-
-        private static void CheckBeforeRun(TextReader input, TextWriter output, out bool canSeek) {
-            if(input == null)
-                throw new ArgumentNullException("input");
-            if(output == null)
-                throw new ArgumentNullException("output");
-
-            canSeek = true;
-            StreamReader sr = input as StreamReader;
-            if(sr != null && !sr.BaseStream.CanSeek)
-                canSeek = false;
         }
 
         private static byte ReadByte(TextReader input, bool canSeek) {

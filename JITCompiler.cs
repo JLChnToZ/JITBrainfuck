@@ -20,7 +20,6 @@ namespace JITBrainfuck {
             const BindingFlags privateStaticMethod = BindingFlags.NonPublic | BindingFlags.Static;
 
             Type baseType = typeof(Runner);
-            MethodInfo checkBeforeRunMethod = baseType.GetMethod("CheckBeforeRun", privateStaticMethod);
             MethodInfo readByteMethod = baseType.GetMethod("ReadByte", privateStaticMethod);
             MethodInfo writeByteMethod = baseType.GetMethod("WriteByte", privateStaticMethod);
 
@@ -73,7 +72,7 @@ namespace JITBrainfuck {
                         il.Emit(OpCodes.Ldelem_U1);
                         il.Emit(OpCodes.Ldc_I4, instruction.count);
                         il.Emit(OpCodes.Add);
-                        il.Emit(OpCodes.Ldc_I4, 256);
+                        il.Emit(OpCodes.Ldc_I4, ByteWrap);
                         il.Emit(OpCodes.Rem);
                         il.Emit(OpCodes.Stelem_I1);
                         break;
