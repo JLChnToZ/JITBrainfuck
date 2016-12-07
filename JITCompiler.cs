@@ -6,7 +6,7 @@ using System.Reflection.Emit;
 
 namespace JITBrainfuck {
     internal struct LabelPair {
-        public Label loopLabel, checkLabel;
+        public Label loopLabel, endLabel;
     }
 
     internal delegate void RunnerDelegate(TextReader input, TextWriter output);
@@ -88,36 +88,34 @@ namespace JITBrainfuck {
                         il.Emit(OpCodes.Add);
                         il.Emit(OpCodes.Ldc_I4, 256);
                         il.Emit(OpCodes.Rem);
-                        il.Emit(OpCodes.Conv_U1);
                         il.Emit(OpCodes.Stelem_I1);
                         break;
                     case Op.Reset:
                         // memory[pointer] = 0;
                         il.Emit(OpCodes.Ldloc, memory);
                         il.Emit(OpCodes.Ldloc, pointer);
-                        il.Emit(OpCodes.Ldc_I4_S, (byte)0);
+                        il.Emit(OpCodes.Ldc_I4_0);
                         il.Emit(OpCodes.Stelem_I1);
                         break;
                     case Op.LoopStart:
-                        // while(...) {
+                        // while(memory[pointer] != 0) {
                         labelPairs.Push(labelPair = new LabelPair {
                             loopLabel = il.DefineLabel(),
-                            checkLabel = il.DefineLabel()
+                            endLabel = il.DefineLabel()
                         });
-                        il.Emit(OpCodes.Br, labelPair.checkLabel);
                         il.MarkLabel(labelPair.loopLabel);
-                        break;
-                    case Op.LoopEnd:
-                        // }
-                        // ...: memory[pointer] != 0
-                        labelPair = labelPairs.Pop();
-                        il.MarkLabel(labelPair.checkLabel);
                         il.Emit(OpCodes.Ldloc, memory);
                         il.Emit(OpCodes.Ldloc, pointer);
                         il.Emit(OpCodes.Ldelem_U1);
                         il.Emit(OpCodes.Ldc_I4_0);
                         il.Emit(OpCodes.Ceq);
-                        il.Emit(OpCodes.Brfalse, labelPair.loopLabel);
+                        il.Emit(OpCodes.Brtrue, labelPair.endLabel);
+                        break;
+                    case Op.LoopEnd:
+                        // }
+                        labelPair = labelPairs.Pop();
+                        il.Emit(OpCodes.Br, labelPair.loopLabel);
+                        il.MarkLabel(labelPair.endLabel);
                         break;
                     case Op.Read:
                         // memory[pointer] = ReadByte(input, canSeek);
