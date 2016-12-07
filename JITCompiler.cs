@@ -9,7 +9,7 @@ namespace JITBrainfuck {
         public Label loopLabel, endLabel;
     }
 
-    internal delegate void RunnerDelegate(TextReader input, TextWriter output);
+    internal delegate void RunnerDelegate(byte[] memory, ref int pointer, TextReader input, TextWriter output, bool canSeek);
 
     public partial class Runner {
         private RunnerDelegate compiledMethod;
@@ -27,41 +27,24 @@ namespace JITBrainfuck {
             DynamicMethod generatedMethod = new DynamicMethod(
                 "_Compiled_",
                 null, new[] {
+                    typeof(byte[]),
+                    typeof(int).MakeByRefType(),
                     typeof(TextReader),
-                    typeof(TextWriter)
+                    typeof(TextWriter),
+                    typeof(bool)
                 },
                 baseType.Module,
                 true
             );
-            generatedMethod.DefineParameter(1, ParameterAttributes.In, "input");
-            generatedMethod.DefineParameter(2, ParameterAttributes.In, "output");
+            generatedMethod.DefineParameter(1, ParameterAttributes.In, "memory");
+            generatedMethod.DefineParameter(2, ParameterAttributes.In | ParameterAttributes.Out, "pointer");
+            generatedMethod.DefineParameter(3, ParameterAttributes.In, "input");
+            generatedMethod.DefineParameter(4, ParameterAttributes.In, "output");
+            generatedMethod.DefineParameter(5, ParameterAttributes.In, "canSeek");
 
             ILGenerator il = generatedMethod.GetILGenerator();
 
-            LocalBuilder canSeek = il.DeclareLocal(typeof(bool));
-            LocalBuilder memory = il.DeclareLocal(typeof(byte[]));
-            LocalBuilder pointer = il.DeclareLocal(typeof(int));
-
             il.Emit(OpCodes.Nop);
-
-            // canSeek = false;
-            il.Emit(OpCodes.Ldc_I4_0);
-            il.Emit(OpCodes.Stloc, canSeek);
-
-            // CheckBeforeRun(input, output, out canSeek);
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Ldarg_1);
-            il.Emit(OpCodes.Ldloca, canSeek);
-            il.Emit(OpCodes.Call, checkBeforeRunMethod);
-
-            // memory = new byte[memoryLength];
-            il.Emit(OpCodes.Ldc_I4, memoryLength);
-            il.Emit(OpCodes.Newarr, typeof(byte));
-            il.Emit(OpCodes.Stloc, memory);
-
-            // pointer = 0;
-            il.Emit(OpCodes.Ldc_I4_0);
-            il.Emit(OpCodes.Stloc, pointer);
 
             Stack<LabelPair> labelPairs = new Stack<LabelPair>();
 
@@ -70,19 +53,23 @@ namespace JITBrainfuck {
                 switch(instruction.op) {
                     case Op.Move:
                         // pointer = (pointer + instruction.count) % memoryLength;
-                        il.Emit(OpCodes.Ldloc, pointer);
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldind_I4);
                         il.Emit(OpCodes.Ldc_I4, instruction.count);
                         il.Emit(OpCodes.Add);
                         il.Emit(OpCodes.Ldc_I4, memoryLength);
                         il.Emit(OpCodes.Rem);
-                        il.Emit(OpCodes.Stloc, pointer);
+                        il.Emit(OpCodes.Stind_I4);
                         break;
                     case Op.Add:
                         // memory[pointer] = (byte)((memory[pointer] + instruction.count) % 256);
-                        il.Emit(OpCodes.Ldloc, memory);
-                        il.Emit(OpCodes.Ldloc, pointer);
-                        il.Emit(OpCodes.Ldloc, memory);
-                        il.Emit(OpCodes.Ldloc, pointer);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldind_I4);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldind_I4);
                         il.Emit(OpCodes.Ldelem_U1);
                         il.Emit(OpCodes.Ldc_I4, instruction.count);
                         il.Emit(OpCodes.Add);
@@ -92,8 +79,9 @@ namespace JITBrainfuck {
                         break;
                     case Op.Reset:
                         // memory[pointer] = 0;
-                        il.Emit(OpCodes.Ldloc, memory);
-                        il.Emit(OpCodes.Ldloc, pointer);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldind_I4);
                         il.Emit(OpCodes.Ldc_I4_0);
                         il.Emit(OpCodes.Stelem_I1);
                         break;
@@ -104,8 +92,9 @@ namespace JITBrainfuck {
                             endLabel = il.DefineLabel()
                         });
                         il.MarkLabel(labelPair.loopLabel);
-                        il.Emit(OpCodes.Ldloc, memory);
-                        il.Emit(OpCodes.Ldloc, pointer);
+                        il.Emit(OpCodes.Ldarg_0);
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldind_I4);
                         il.Emit(OpCodes.Ldelem_U1);
                         il.Emit(OpCodes.Ldc_I4_0);
                         il.Emit(OpCodes.Ceq);
@@ -119,18 +108,20 @@ namespace JITBrainfuck {
                         break;
                     case Op.Read:
                         // memory[pointer] = ReadByte(input, canSeek);
-                        il.Emit(OpCodes.Ldloc, memory);
-                        il.Emit(OpCodes.Ldloc, pointer);
                         il.Emit(OpCodes.Ldarg_0);
-                        il.Emit(OpCodes.Ldloc, canSeek);
+                        il.Emit(OpCodes.Ldarg_1);
+                        il.Emit(OpCodes.Ldind_I4);
+                        il.Emit(OpCodes.Ldarg_2);
+                        il.Emit(OpCodes.Ldarg_S, (byte)4);
                         il.Emit(OpCodes.Call, readByteMethod);
                         il.Emit(OpCodes.Stelem_I1);
                         break;
                     case Op.Write:
                         // WriteByte(memory[pointer]);
+                        il.Emit(OpCodes.Ldarg_3);
+                        il.Emit(OpCodes.Ldarg_0);
                         il.Emit(OpCodes.Ldarg_1);
-                        il.Emit(OpCodes.Ldloc, memory);
-                        il.Emit(OpCodes.Ldloc, pointer);
+                        il.Emit(OpCodes.Ldind_I4);
                         il.Emit(OpCodes.Ldelem_I1);
                         il.Emit(OpCodes.Call, writeByteMethod);
                         break;

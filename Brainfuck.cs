@@ -148,18 +148,20 @@ namespace JITBrainfuck {
         }
 
         public void Run(TextReader input, TextWriter output) {
-            if(compiledMethod != null) {
-                compiledMethod.Invoke(input, output);
-                return;
-            }
-
             bool canSeek;
             CheckBeforeRun(input, output, out canSeek);
 
-            Stack<int> loopPoints = new Stack<int>(stackDepth);
             byte[] memory = new byte[memoryLength];
+            int pointer = 0;
 
-            for(int cursor = 0, pointer = 0, skip = 0, length = instructions.Count; cursor < length; cursor++) {
+            if(compiledMethod != null) {
+                compiledMethod.Invoke(memory, ref pointer, input, output, canSeek);
+                return;
+            }
+
+            Stack<int> loopPoints = new Stack<int>(stackDepth);
+
+            for(int cursor = 0, skip = 0, length = instructions.Count; cursor < length; cursor++) {
                 Instruction instruction = instructions[cursor];
                 switch(instruction.op) {
                     case Op.Move:
