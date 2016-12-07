@@ -67,8 +67,8 @@ namespace JITBrainfuck {
                     Runner runner = new Runner(content, options.MemorySize, options.MaxStackDepth);
 
                     if(!string.IsNullOrEmpty(options.OutputFileName)) {
-                        if(string.IsNullOrEmpty(options.OutputFileName))
-                            options.OutputAssemblyName = "Brainfuck-Compiled-Code";
+                        if(string.IsNullOrEmpty(options.OutputAssemblyName))
+                            options.OutputAssemblyName = Path.GetFileNameWithoutExtension(options.OutputFileName);
                         Console.WriteLine("Creating assembly {0} to {1}...", options.OutputAssemblyName, options.OutputFileName);
                         BF2Assembly.CompileToFile(runner, options.OutputAssemblyName, options.OutputFileName);
                         return;
