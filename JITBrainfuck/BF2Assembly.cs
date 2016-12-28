@@ -19,14 +19,8 @@ namespace JITBrainfuck {
             TypeBuilder typeBuild = modBuild.DefineType("Program");
 
             MethodBuilder runMethod = typeBuild.DefineMethod("Run", MethodAttributes.Static | MethodAttributes.Private);
-            runMethod.SetParameters(
-                typeof(byte[]),
-                typeof(int).MakeByRefType(),
-                typeof(TextReader),
-                typeof(TextWriter),
-                typeof(bool)
-            );
-            runner.EmitIL(runMethod.GetILGenerator());
+            runMethod.SetParameters(Compiler.parameterTypes);
+            Compiler.EmitIL(runner, runMethod.GetILGenerator());
 
             MethodBuilder mainMethod = typeBuild.DefineMethod("Main", MethodAttributes.Static | MethodAttributes.Public);
             mainMethod.SetParameters(
