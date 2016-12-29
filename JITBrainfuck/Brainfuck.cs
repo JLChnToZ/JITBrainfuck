@@ -34,8 +34,6 @@ namespace JITBrainfuck {
         public const int DefaultMemoryLength = 30000;
         public const int DefaultStackDepth = 256;
 
-        private const int ByteWrap = 256;
-
         public int MemoryLength {
             get { return memoryLength; }
         }
@@ -130,7 +128,7 @@ namespace JITBrainfuck {
                             lastInstruction.count = (lastInstruction.count + count) % memoryLength;
                             break;
                         case Op.Add:
-                            lastInstruction.count = (lastInstruction.count + count) % ByteWrap;
+                            lastInstruction.count = (lastInstruction.count + count) & byte.MaxValue;
                             break;
                     }
                     instructions[cursor] = lastInstruction;
@@ -180,7 +178,7 @@ namespace JITBrainfuck {
                         break;
                     case Op.Add:
                         if(skip == 0)
-                            memory[pointer] = (byte)((memory[pointer] + instruction.count) % ByteWrap);
+                            memory[pointer] = (byte)((memory[pointer] + instruction.count) & byte.MaxValue);
                         break;
                     case Op.Reset:
                         if(skip == 0)

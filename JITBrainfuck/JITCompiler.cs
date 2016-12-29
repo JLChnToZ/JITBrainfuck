@@ -51,15 +51,15 @@ namespace JITBrainfuck {
             this.inst = inst;
         }
 
-        public void Emit(ILGenerator il, params object[] ps) {
+        public void Emit(ILGenerator il, object[] args) {
             if(inst == null) return;
-            int idx = 0;
+            int i = 0;
             foreach(OpCodeParam ins in inst) {
                 if(ins.typeCode == TypeCode.Empty) {
                     il.Emit(ins.opCode);
                     continue;
                 }
-                object arg = GetParameter(ins, ref idx, ps);
+                object arg = GetParameter(ins, ref i, args);
                 switch(Convert.GetTypeCode(arg)) {
                     case TypeCode.Byte: il.Emit(ins.opCode, Convert.ToByte(arg)); break;
                     case TypeCode.SByte: il.Emit(ins.opCode, Convert.ToSByte(arg)); break;
@@ -93,23 +93,23 @@ namespace JITBrainfuck {
             }
         }
 
-        private static object GetParameter(OpCodeParam instruction, ref int index, object[] parameters) {
+        private static object GetParameter(OpCodeParam instruction, ref int index, object[] args) {
             if(instruction.para != null)
                 return instruction.para;
-            if(parameters.Length > index)
-                return parameters[index++];
+            if(args.Length > index)
+                return args[index++];
             return null;
         }
     }
 
-    internal static class Compiler {
+    internal class Compiler {
         private const BindingFlags staticMethod = BindingFlags.Public | BindingFlags.Static;
 
-        private static Type baseType = typeof(Helper);
-        private static MethodInfo readByteMethod = baseType.GetMethod("ReadByte", staticMethod);
-        private static MethodInfo writeByteMethod = baseType.GetMethod("WriteByte", staticMethod);
+        private static readonly Type baseType = typeof(Helper);
+        private static readonly MethodInfo readByteMethod = baseType.GetMethod("ReadByte", staticMethod);
+        private static readonly MethodInfo writeByteMethod = baseType.GetMethod("WriteByte", staticMethod);
 
-        public static Type[] parameterTypes = new[] {
+        public static readonly Type[] parameterTypes = new[] {
             typeof(byte[]),
             typeof(int).MakeByRefType(),
             typeof(TextReader),
@@ -117,7 +117,18 @@ namespace JITBrainfuck {
             typeof(bool)
         };
 
-        private static OpCodeMapping[] mappings = new[] {
+        private static readonly OpCodeMapping opMovePowerOf2 = new OpCodeMapping(Op.Move,
+            OpCodes.Ldarg_1,
+            OpCodes.Ldarg_1,
+            OpCodes.Ldind_I4,
+            new OpCodeParam(OpCodes.Ldc_I4, TypeCode.Int32),
+            OpCodes.Add,
+            new OpCodeParam(OpCodes.Ldc_I4, TypeCode.Int32),
+            OpCodes.And,
+            OpCodes.Stind_I4
+        );
+
+        private static readonly OpCodeMapping[] mappings = new[] {
             new OpCodeMapping(Op.Unknown),
 
             // pointer = (pointer + instruction.count) % memoryLength;
@@ -143,8 +154,8 @@ namespace JITBrainfuck {
                 OpCodes.Ldelem_U1,
                 new OpCodeParam(OpCodes.Ldc_I4, TypeCode.Int32),
                 OpCodes.Add,
-                new OpCodeParam(OpCodes.Ldc_I4, TypeCode.Int32),
-                OpCodes.Rem,
+                new OpCodeParam(OpCodes.Ldc_I4, (int)byte.MaxValue),
+                OpCodes.And,
                 OpCodes.Stelem_I1
             ),
 
@@ -195,39 +206,78 @@ namespace JITBrainfuck {
             )
         };
 
-        public static void EmitIL(Runner runner, ILGenerator il) {
-            Stack<LabelPair> labelPairs = new Stack<LabelPair>(runner.StackDepth);
-            int memoryLength = runner.MemoryLength;
+        private readonly Stack<LabelPair> loopPoints;
+        private readonly int memoryLength;
+        private readonly int memoryMask;
+        private readonly IList<Instruction> instructions;
+        private readonly object[] args;
+        private ILGenerator il;
+
+        public ILGenerator ILGen {
+            get { return il; }
+            set { il = value; }
+        }
+
+        public Compiler(Runner runner) {
+            loopPoints = new Stack<LabelPair>(runner.StackDepth);
+            instructions = runner.Instructions;
+            memoryLength = runner.MemoryLength;
+            memoryMask = IsPowerOf2(memoryLength) ? memoryLength - 1 : 0;
+            args = new object[2];
+        }
+
+        public static bool IsPowerOf2(int n) {
+            return (n & (n - 1)) == 0;
+        }
+
+        public void Emit() {
             il.Emit(OpCodes.Nop);
-            foreach(Instruction inst in runner.Instructions) {
-                LabelPair labelPair;
-                OpCodeMapping mapping = mappings[(int)inst.op];
+            foreach(Instruction inst in instructions) {
                 switch(inst.op) {
-                    case Op.Move:
-                        mapping.Emit(il, inst.count, memoryLength);
-                        break;
-                    case Op.Add:
-                        mapping.Emit(il, inst.count, 256);
-                        break;
-                    case Op.LoopStart:
-                        labelPairs.Push(labelPair = new LabelPair(il));
-                        il.MarkLabel(labelPair.loopLabel);
-                        mapping.Emit(il, labelPair.endLabel);
-                        break;
-                    case Op.LoopEnd:
-                        labelPair = labelPairs.Pop();
-                        mapping.Emit(il, labelPair.loopLabel);
-                        il.MarkLabel(labelPair.endLabel);
-                        break;
+                    case Op.Move: EmitMove(inst.count); break;
+                    case Op.Add: EmitAdd(inst.count); break;
+                    case Op.LoopStart: EmitLoopStart(); break;
+                    case Op.LoopEnd: EmitLoopEnd(); break;
                     case Op.Reset:
                     case Op.Read:
-                    case Op.Write:
-                        mapping.Emit(il);
-                        break;
+                    case Op.Write: Emit(inst.op); break;
                 }
             }
             il.Emit(OpCodes.Nop);
             il.Emit(OpCodes.Ret);
+        }
+
+        private void EmitMove(int count) {
+            if(memoryMask == 0) {
+                Emit(Op.Move, count, memoryLength);
+                return;
+            }
+            args[0] = count;
+            args[1] = memoryMask;
+            opMovePowerOf2.Emit(il, args);
+        }
+
+        private void EmitAdd(int count) {
+            Emit(Op.Add, count);
+        }
+
+        private void EmitLoopStart() {
+            LabelPair labelPair = new LabelPair(il);
+            il.MarkLabel(labelPair.loopLabel);
+            Emit(Op.LoopStart, labelPair.endLabel);
+            loopPoints.Push(labelPair);
+        }
+
+        private void EmitLoopEnd() {
+            LabelPair labelPair = loopPoints.Pop();
+            Emit(Op.LoopEnd, labelPair.loopLabel);
+            il.MarkLabel(labelPair.endLabel);
+        }
+
+        private void Emit(Op op, object param1 = null, object param2 = null) {
+            args[0] = param1;
+            args[1] = param2;
+            mappings[(int)op].Emit(il, args);
         }
     }
 
@@ -250,8 +300,11 @@ namespace JITBrainfuck {
             generatedMethod.DefineParameter(3, ParameterAttributes.In, "input");
             generatedMethod.DefineParameter(4, ParameterAttributes.In, "output");
             generatedMethod.DefineParameter(5, ParameterAttributes.In, "canSeek");
-            
-            Compiler.EmitIL(this, generatedMethod.GetILGenerator());
+
+            Compiler compiler = new Compiler(this);
+            compiler.ILGen = generatedMethod.GetILGenerator();
+            compiler.Emit();
+
             compiledMethod = generatedMethod.CreateDelegate(typeof(RunnerDelegate)) as RunnerDelegate;
         }
     }

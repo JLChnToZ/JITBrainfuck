@@ -20,7 +20,10 @@ namespace JITBrainfuck {
 
             MethodBuilder runMethod = typeBuild.DefineMethod("Run", MethodAttributes.Static | MethodAttributes.Private);
             runMethod.SetParameters(Compiler.parameterTypes);
-            Compiler.EmitIL(runner, runMethod.GetILGenerator());
+
+            Compiler compiler = new Compiler(runner);
+            compiler.ILGen = runMethod.GetILGenerator();
+            compiler.Emit();
 
             MethodBuilder mainMethod = typeBuild.DefineMethod("Main", MethodAttributes.Static | MethodAttributes.Public);
             mainMethod.SetParameters(
