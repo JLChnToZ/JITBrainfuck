@@ -31,7 +31,7 @@ namespace JITBrainfuck {
         private readonly List<Instruction> instructions;
         private IList<Instruction> readOnlyInstructions;
 
-        public const int DefaultMemoryLength = 30000;
+        public const int DefaultMemoryLength = 65536;
         public const int DefaultStackDepth = 256;
 
         public int MemoryLength {

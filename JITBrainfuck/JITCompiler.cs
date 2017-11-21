@@ -60,7 +60,9 @@ namespace JITBrainfuck {
                     continue;
                 }
                 object arg = GetParameter(ins, ref i, args);
-                switch(Convert.GetTypeCode(arg)) {
+                TypeCode typeCode = Convert.GetTypeCode(arg);
+                if(EmitOptimized(il, ins.opCode, typeCode, arg)) continue;
+                switch(typeCode) {
                     case TypeCode.Byte: il.Emit(ins.opCode, Convert.ToByte(arg)); break;
                     case TypeCode.SByte: il.Emit(ins.opCode, Convert.ToSByte(arg)); break;
                     case TypeCode.Int16: il.Emit(ins.opCode, Convert.ToInt16(arg)); break;
@@ -91,6 +93,62 @@ namespace JITBrainfuck {
                         break;
                 }
             }
+        }
+
+        private static bool EmitOptimized(ILGenerator il, OpCode opCode, TypeCode typeCode, object arg) {
+            switch(typeCode) {
+                case TypeCode.Byte:
+                case TypeCode.SByte:
+                case TypeCode.Int16:
+                case TypeCode.Int32:
+                case TypeCode.Int64:
+                    if(opCode == OpCodes.Ldc_I4 || opCode == OpCodes.Ldc_I4_S)
+                        return EmitOptimizedLdc(il, arg);
+                    else if(opCode == OpCodes.Ldloca || opCode == OpCodes.Ldloc_S)
+                        return EmitOptimizedLdloc(il, arg);
+                    break;
+            }
+            return false;
+        }
+
+        private static bool EmitOptimizedLdc(ILGenerator il, object arg) {
+            long value = Convert.ToInt64(arg);
+            switch(value) {
+                case -1: il.Emit(OpCodes.Ldc_I4_M1); break;
+                case 0: il.Emit(OpCodes.Ldc_I4_0); break;
+                case 1: il.Emit(OpCodes.Ldc_I4_1); break;
+                case 2: il.Emit(OpCodes.Ldc_I4_2); break;
+                case 3: il.Emit(OpCodes.Ldc_I4_3); break;
+                case 4: il.Emit(OpCodes.Ldc_I4_4); break;
+                case 5: il.Emit(OpCodes.Ldc_I4_5); break;
+                case 6: il.Emit(OpCodes.Ldc_I4_6); break;
+                case 7: il.Emit(OpCodes.Ldc_I4_7); break;
+                case 8: il.Emit(OpCodes.Ldc_I4_8); break;
+                default:
+                    if(value < 256 && value > 0) {
+                        il.Emit(OpCodes.Ldc_I4_S, unchecked((byte)value));
+                        break;
+                    }
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool EmitOptimizedLdloc(ILGenerator il, object arg) {
+            long value = Convert.ToInt64(arg);
+            switch(value) {
+                case 0: il.Emit(OpCodes.Ldloc_0); break;
+                case 1: il.Emit(OpCodes.Ldloc_1); break;
+                case 2: il.Emit(OpCodes.Ldloc_2); break;
+                case 3: il.Emit(OpCodes.Ldloc_3); break;
+                default:
+                    if(value < 256 && value > 0) {
+                        il.Emit(OpCodes.Ldloc_S, unchecked((byte)value));
+                        break;
+                    }
+                    return false;
+            }
+            return true;
         }
 
         private static object GetParameter(OpCodeParam instruction, ref int index, object[] args) {
@@ -128,6 +186,24 @@ namespace JITBrainfuck {
             OpCodes.Stind_I4
         );
 
+        private static readonly OpCodeMapping opMove8 = new OpCodeMapping(Op.Move,
+            OpCodes.Ldarg_1,
+            OpCodes.Ldarg_1,
+            OpCodes.Ldind_I4,
+            new OpCodeParam(OpCodes.Ldc_I4, TypeCode.Byte),
+            OpCodes.Add,
+            OpCodes.Stind_I1
+        );
+
+        private static readonly OpCodeMapping opMove16 = new OpCodeMapping(Op.Move,
+            OpCodes.Ldarg_1,
+            OpCodes.Ldarg_1,
+            OpCodes.Ldind_I4,
+            new OpCodeParam(OpCodes.Ldc_I4, TypeCode.Int16),
+            OpCodes.Add,
+            OpCodes.Stind_I2
+        );
+
         private static readonly OpCodeMapping[] mappings = new[] {
             new OpCodeMapping(Op.Unknown),
 
@@ -143,7 +219,7 @@ namespace JITBrainfuck {
                 OpCodes.Stind_I4
             ),
 
-            // memory[pointer] = (byte)((memory[pointer] + instruction.count) % 256);
+            // memory[pointer] = unchecked((byte)(memory[pointer] + instruction.count));
             new OpCodeMapping(Op.Add,
                 OpCodes.Ldarg_0,
                 OpCodes.Ldarg_1,
@@ -154,8 +230,6 @@ namespace JITBrainfuck {
                 OpCodes.Ldelem_U1,
                 new OpCodeParam(OpCodes.Ldc_I4, TypeCode.Int32),
                 OpCodes.Add,
-                new OpCodeParam(OpCodes.Ldc_I4, (int)byte.MaxValue),
-                OpCodes.And,
                 OpCodes.Stelem_I1
             ),
 
@@ -253,6 +327,10 @@ namespace JITBrainfuck {
                 return;
             }
             args[0] = count;
+            switch(memoryMask) {
+                case 255: opMove8.Emit(il, args); return;
+                case 65535: opMove16.Emit(il, args); return;
+            }
             args[1] = memoryMask;
             opMovePowerOf2.Emit(il, args);
         }

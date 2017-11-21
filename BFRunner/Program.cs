@@ -9,7 +9,7 @@ using CommandLine.Text;
 namespace JITBrainfuck {
     class Options {
         [Option('s', "memorysize",
-            HelpText = "Memory size, default is 30000.",
+            HelpText = "Memory size, default is 65536.",
             DefaultValue = Runner.DefaultMemoryLength)]
         public int MemorySize { get; set; }
 
