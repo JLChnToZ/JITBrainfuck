@@ -248,9 +248,7 @@ namespace JITBrainfuck {
                 OpCodes.Ldarg_1,
                 OpCodes.Ldind_I4,
                 OpCodes.Ldelem_U1,
-                OpCodes.Ldc_I4_0,
-                OpCodes.Ceq,
-                new OpCodeParam(OpCodes.Brtrue, TypeCode.Object)
+                new OpCodeParam(OpCodes.Brfalse, TypeCode.Object)
             ),
 
             // }
